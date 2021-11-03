@@ -268,20 +268,41 @@ function read_petalo(filename::String)
     rename!(parts, :initial_x => :x, :initial_y => :y, :initial_z => :z,
         :initial_momentum_x => :vx, :initial_momentum_y => :vy, :initial_momentum_z => :vz)
     transform!(parts, :event_id => ByRow(Int), renamecols=false)
+    ## Gymnastics to get the SiPM hit info.
+    total_charge = combine(groupby(sns_q, [:event_id, :sensor_id]), :charge => sum, renamecols=false)
+    transform!(total_charge, :event_id => ByRow(Int), renamecols=false)
+    ## Now get time bins and combine the tof (first few bins) with the rest of the charge.
+    transform!(sns_tof, :sensor_id => ByRow(abs), renamecols=false)
+    tof_Q = combine(groupby(sns_tof, [:event_id, :sensor_id]),
+        :charge => sum => :tcharge, :time_bin => (x -> maximum(x) + one(UInt32)) => :time_bin)
+    evt_tmax = combine(groupby(tof_Q, :event_id), :time_bin => maximum => :tmax)
+    transform!(tof_Q, :tcharge => ByRow(UInt32), renamecols=false)
+    wvf = leftjoin(total_charge, tof_Q, on=[:event_id, :sensor_id])
+    replace!(wvf.tcharge, missing => zero(UInt32))
+    #replace!(wvf.time_bin, missing => one(UInt32))
+    disallowmissing!(wvf, :tcharge)
+    transform!(groupby(wvf, [:event_id, :sensor_id]), [:charge, :tcharge] => (-) => :charge)
+    wvf_all = vcat(sns_tof, wvf[!, [:event_id, :sensor_id, :time_bin, :charge]])
+    ## Any missing time_bins are sensors that don't appear in the tof
+    ## Set the bin to 1 bigger than event max to avoid interfering with mins.
+    wvf_all = leftjoin(wvf_all, evt_tmax, on=:event_id)
+    transform!(wvf_all, [:time_bin, :tmax] => ByRow((tb, tm) -> ismissing(tb) ? tm * 5e-3 : tb * 5e-3) => :time)
+    #transform!(wvf_all, :time_bin => (x -> x * 5e-3) => :time)
     ## sns_q used as total_charge in abracadabra, sum the charge for each
-    sns_q = combine(groupby(sns_q, [:event_id, :sensor_id]), :charge => sum => :charge)
-    transform!(sns_q, :event_id => ByRow(Int), renamecols=false)
+    #sns_q = combine(groupby(sns_q, [:event_id, :sensor_id]), :charge => sum, renamecols=false)
+    #transform!(sns_q, :event_id => ByRow(Int), renamecols=false)
     ## tof_sns_response used as waveform. Need to convert time_bin to time (ns) and
     ## split multi-charge rows into charge rows. Also sensor_id negative for some reason
-    transform!(sns_tof, :sensor_id => ByRow(x -> x < 0 ? -x : x), renamecols=false)
-    transform!(sns_tof, :time_bin => (x -> x * 5e-3) => :time)
+    #transform!(sns_tof, :sensor_id => ByRow(abs), renamecols=false)
+    #transform!(sns_tof, :time_bin => (x -> x * 5e-3) => :time)
     ## Can't think of a better way to repeat rows according to charge:
-    sns_tof = DataFrame(vcat([[x[[:event_id, :sensor_id, :time]] for i in 1:x.charge] for x in eachrow(sns_tof)]...))
-    transform!(sns_tof, :event_id => ByRow(Int), renamecols=false)
+    wvf_all = DataFrame(vcat([[x[[:event_id, :sensor_id, :time]] for i in 1:x.charge] for x in eachrow(wvf_all)]...))
+    transform!(wvf_all, :event_id => ByRow(Int), renamecols=false)
     ## Get rid of the name in the sensor_xyz
     sns_xyz = sns_xyz[:, [:sensor_id, :x, :y, :z]]
 
-    return ATools.PetaloDF(volumes, processes, sns_xyz, parts, hits, sns_q, sns_tof)
+    return ATools.PetaloDF(volumes, processes, sns_xyz,
+        parts, hits, total_charge, wvf_all)
 end
 
 
