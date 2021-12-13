@@ -47,10 +47,10 @@ function calibrate_lors()
     confArgs     = parse_args(s)
 
     conf         = from_toml(NReco.CalConfig, confArgs["conf"])
-    if confArgs['output-file'] == "default"
+    if confArgs["output-file"] == "default"
         outfile  = joinpath(path_out, conf.conf_dir[1:end-1])
     else
-        outfile  = joinpath(path_out, confArgs['output-file'])
+        outfile  = joinpath(path_out, confArgs["output-file"])
     end
 
 
