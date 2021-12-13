@@ -47,15 +47,16 @@ function calibrate_lors()
     confArgs     = parse_args(s)
 
     conf         = from_toml(NReco.CalConfig, confArgs["conf"])
-    if confArgs["output-file"] == "default"
-        outfile  = joinpath(path_out, conf.conf_dir[1:end-1])
-    else
-        outfile  = joinpath(path_out, confArgs["output-file"])
-    end
 
 
     (path_in ,
      path_out)   = define_paths(conf)
+
+     if confArgs["output-file"] == "default"
+         outfile = joinpath(path_out, conf.conf_dir[1:end-1])
+     else
+         outfile = joinpath(path_out, confArgs["output-file"])
+     end
 
     (nsim, rmin,
      rmax, ndf ) = read_evtpar(glob("evt*.h5", path_in))
