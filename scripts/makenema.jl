@@ -41,7 +41,12 @@ function makenema(args)
 
 	## Patch here so we can read actually select in a directory which
 	## is already partially processed. Needs to be improved in general.
+<<<<<<< HEAD
 	files  = sort(glob(f_pattern, dr), by=x->parse(Int64, split(x, "-")[end][1:end-3]))
+=======
+	#files  = sort(glob("*.h5", dr), by=x->parse(Int64, split(x, "-")[end][1:end-3]))
+	files = glob("*.h5", dr)
+>>>>>>> 89b8515 (Remove sort)
 
 	if detconf != "default"
 		dconf = from_toml(NReco.DetConf, detconf)
