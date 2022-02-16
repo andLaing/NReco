@@ -311,8 +311,7 @@ function nemareco(files    ::Vector{String},
 		waveforms = groupby(pdf.waveform , :event_id)
 		## For true vertex saving, can have detected charge from
 		## gamma vertices in LXe and Steel_1 (naming stable?)
-		volumes   = findall((pdf.volume_names .==     "LXe") .|
-							(pdf.volume_names .== "Steel_1")   ) .- 1
+		volumes   = findall(pdf.volume_names .== "ACTIVE") .- 1
 
 		for (event, wvf) in pairs(waveforms)
 			nema_dict!(output_vector, event.event_id, dconf, pdf.sensor_xyz, volumes,
