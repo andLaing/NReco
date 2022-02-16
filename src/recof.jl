@@ -245,7 +245,7 @@ function read_petalo(filename::String)
     transform!(hits, :label => ByRow(x -> findfirst(volumes .== x) - 1) => :volume_id,
         :particle_id => ByRow(x -> in((1, 2))(x) ? 0 : x - 1) => :parent_id,
         :final_proc  => ByRow(x -> findfirst(processes .== x)) => :process_id)
-    rename!(hits, :time => :t, :particle_id => :track_id)
+    rename!(hits, :time => :t, :particle_id => :track_id, :energy => :pre_KE)
     transform!(hits, :event_id => ByRow(Int), renamecols=false)
     ## particles to act like primaries
     filter!(x -> x.primary == 1, parts)
