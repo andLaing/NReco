@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 using ATools
 
 using Clustering
@@ -7,6 +8,15 @@ using HDF5
 using LinearAlgebra
 using Statistics
 using StatsModels
+=======
+using DataFrames
+using StatsModels
+using Clustering
+using Statistics
+using LinearAlgebra
+using HDF5
+using ATools
+>>>>>>> 4821f5f (First working  version of petalo output reader)
 
 # Selection
 
@@ -227,6 +237,54 @@ function filter_energies(df::DataFrame, qmin::Float32, qmax::Float32)
     interval = ATools.range_bound(qmin, qmax, ATools.OpenBound)
     filter(x -> interval.(x.q1) .& interval.(x.q2), df)
 end
+
+"""
+Read petalo sim data and coerce into something resembling abracadabra
+"""
+function read_petalo(filename::String)
+    (hits, parts, sns_xyz, sns_q, sns_tof) = h5open(filename) do h5in
+        hits    = readh5_todf(h5in, "MC", "hits")
+        parts   = readh5_todf(h5in, "MC", "particles")
+        sns_pos = readh5_todf(h5in, "MC", "sns_positions")
+        sns_q   = readh5_todf(h5in, "MC", "sns_response")
+        sns_tof = readh5_todf(h5in, "MC", "tof_sns_response")
+        return hits, parts, sns_pos, sns_q, sns_tof
+    end
+
+    ## start coercing
+    processes = unique(parts.final_proc)
+    volumes   = unique(hits.label)
+    ## hits like vertices in abracadabra, need volume_id, parent_id, track_id, process_id
+    hits = leftjoin(hits, parts[:, [:event_id, :particle_id, :final_proc]], on=[:event_id, :particle_id])
+    transform!(hits, :label => ByRow(x -> findfirst(volumes .== x) - 1) => :volume_id,
+        :particle_id => ByRow(x -> in((1, 2))(x) ? 0 : x - 1) => :parent_id,
+        :final_proc  => ByRow(x -> findfirst(processes .== x)) => :process_id)
+    rename!(hits, :time => :t, :particle_id => :track_id)
+    transform!(hits, :event_id => ByRow(Int), renamecols=false)
+    ## particles to act like primaries
+    filter!(x -> x.primary == 1, parts)
+    parts = parts[:, [:event_id, :initial_x, :initial_y, :initial_z,
+        :initial_momentum_x, :initial_momentum_y, :initial_momentum_z]]
+    rename!(parts, :initial_x => :x, :initial_y => :y, :initial_z => :z,
+        :initial_momentum_x => :vx, :initial_momentum_y => :vy, :initial_momentum_z => :vz)
+    transform!(parts, :event_id => ByRow(Int), renamecols=false)
+    ## sns_q used as total_charge in abracadabra, sum the charge for each
+    sns_q = combine(groupby(sns_q, [:event_id, :sensor_id]), :charge => sum => :charge)
+    transform!(sns_q, :event_id => ByRow(Int), renamecols=false)
+    ## tof_sns_response used as waveform. Need to convert time_bin to time (ns) and
+    ## split multi-charge rows into charge rows. Also sensor_id negative for some reason
+    transform!(sns_tof, :sensor_id => ByRow(x -> x < 0 ? -x : x), renamecols=false)
+    transform!(sns_tof, :time_bin => (x -> x * 5e-3) => :time)
+    ## Can't think of a better way to repeat rows according to charge:
+    sns_tof = DataFrame(vcat([[x[[:event_id, :sensor_id, :time]] for i in 1:x.charge] for x in eachrow(sns_tof)]...))
+    transform!(sns_tof, :event_id => ByRow(Int), renamecols=false)
+    ## Get rid of the name in the sensor_xyz
+    sns_xyz = sns_xyz[:, [:sensor_id, :x, :y, :z]]
+
+    return ATools.PetaloDF(volumes, processes, sns_xyz, parts, hits, sns_q, sns_tof)
+end
+
+
 
 
 """

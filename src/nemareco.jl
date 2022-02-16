@@ -76,14 +76,14 @@ be in (dc.qmin, dc.qmax).
 function check_valid_charge(h1::DataFrame, h2::DataFrame, dc::DetConf)
 	q1 = sum(h1.q)
 	q2 = sum(h2.q)
-	@info " total charge: q1 = $(q1), q2 = $(q2)"
+	@info " total charge: q1 = $q1, q2 = $q2"
 	if q1 < dc.qmin || q1 > dc.qmax
-		@info "Warning, q1 is $(q1) for event"
+		@info "Warning, q1 is $q1"
 		return false
 	end
 
 	if q2 < dc.qmin || q2 > dc.qmax
-		@info "Warning, q2 is $(q2) for event"
+		@info "Warning, q2 is $q2"
 		return false
 	end
 	return true
@@ -299,7 +299,8 @@ function nemareco(files    ::Vector{String},
 
 	for file in files[file_i:file_l]
 		println("reading file = ", file)
-		pdf = read_abc(file)
+		#pdf = read_abc(file)            # read file
+		pdf = NReco.read_petalo(file)
 
 		# count the total number of events generated.
 		# This, like many other sections assumes primary generation of gammas.
