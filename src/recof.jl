@@ -109,7 +109,11 @@ function reassign_labels(b1::Hit, df1::DataFrame, b2::Hit, df2::DataFrame)
 	if phi1 >= 0.0
 		return b1, df1, b2, df2
 	end
+<<<<<<< HEAD
 	return b2, df2, b1, df1
+=======
+	return b2, df2, b1, df2
+>>>>>>> 682fcf9 (Add reassignment of hemisphere labels)
 end
 
 """
