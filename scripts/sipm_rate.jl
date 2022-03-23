@@ -25,13 +25,12 @@ function sipm_rate(file_path::String, outfile::String, dconf::NReco.DetConf,
 
     simd_events = 0
     evt_sipm    = SiPMEvt[]
+    time_bins   = NReco.calculate_timebins(source_rate, evt_window)
     for fn in glob("*.h5", file_path)
         pdf = read_abc(fn)
 
-        simd_events += nrow(pdf.primaries)
-        mixed_waveforms = NReco.calculate_timebins(pdf.primaries[:, [:event_id]],
-                                                   pdf.waveform,
-                                                   source_rate, evt_window)
+        simd_events    += nrow(pdf.primaries)
+        mixed_waveforms = time_bins(pdf.primaries[:, [:event_id]], pdf.waveform)
         # for wvf in groupby(pdf.waveform, :event_id)
         for wvf in groupby(mixed_waveforms, :time_bin)
             reco_hits  = NReco.select_sensors(wvf, dconf.ecut, dconf.pde, dconf.sigma_tof)

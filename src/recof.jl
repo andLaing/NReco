@@ -12,20 +12,22 @@ using Unitful
 
 
 # Time bins for event mixing.
-function calculate_timebins(evts::DataFrame, waveforms  ::DataFrame,
-	                        rate::Float32  , time_window::Float32  )
+function calculate_timebins(rate::Float32, time_window::Float32)::Function
 	# Assume rate in Bq and convert to a period in ns
 	period = uconvert(Unitful.ns, 1.0 / (rate * Unitful.Bq))
 	# Assumes constant rate for now, will be improved
 	time_dist = Exponential(period / Unitful.ns)
-	evts[!, :evt_time] = cumsum([0.0, rand(time_dist, nrow(evts) -1)...])
-	function bin_events(x::Vector{Float64})
-		bin_edges = collect(0:time_window:x[end]+nextfloat(x[end]))
-		ATools.digitize(x, bin_edges)
+	function bin_events(x::Vector{Float64})::Vector{Int64}
+		bin_edges = 0:time_window:x[end]
+		searchsortedlast.(Ref(bin_edges), x)
 	end
-	wvfs = innerjoin(waveforms, evts, on=:event_id)
-	transform!(wvfs, [:time, :evt_time] => (+) => :time)
-	transform!(wvfs, :time => bin_events => :time_bin)
+	function calculate_bins(evts::DataFrame, waveforms::DataFrame)::DataFrame
+		evts[!, :evt_time] = [0.0, cumsum(rand(time_dist, nrow(evts) - 1))...]
+		wvfs = innerjoin(waveforms, evts, on=:event_id)
+		transform!(wvfs, [:time, :evt_time] => (+) => :time)
+		transform!(wvfs, :time => bin_events => :time_bin)
+	end
+	return calculate_bins
 end
 
 # Selection
