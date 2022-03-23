@@ -37,7 +37,7 @@ function sipm_rate(file_path::String, outfile::String, dconf::NReco.DetConf,
             if !isnothing(reco_hits) && !isempty(reco_hits)
                 nevt     = length(unique(wvf.event_id))
                 nsens    = length(keys(reco_hits))
-                min_maxt = combine(reco_hits, :mtime => minimum => :minv, :mtime => maximum => :maxv)
+                min_maxt = combine(reco_hits, :mtime => (x -> [extrema(x)]) => [:minv, :maxv])
                 tmin     = minimum(min_maxt.minv) 
                 tmax     = maximum(min_maxt.maxv)
                 push!(evt_sipm, SiPMEvt(nevt = nevt, nsipm = nsens, tmin = tmin, tmax = tmax))
