@@ -18,6 +18,21 @@ import Base.@kwdef
     nsipm::Int64   = zero(Int64)
     tmin ::Float32 = zero(Float32)
     tmax ::Float32 = zero(Float32)
+    k2sil::Float32 = zero(Float32)
+    k3sil::Float32 = zero(Float32)
+    k4sil::Float32 = zero(Float32)
+end
+
+using Clustering
+using Distances
+using Statistics
+function lor_kmeansTest(hitdf::DataFrame, k::Int64)
+    Mhits = transpose(Matrix(hitdf[!, [:x, :y, :z]]))
+	kr    = kmeans(Mhits, k, weights=hitdf.q)
+	#ka    = assignments(kr)
+
+    distances = pairwise(SqEuclidean(), Mhits)
+	mean(silhouettes(kr, distances))
 end
 
 function sipm_rate(file_path::String, outfile::String, dconf::NReco.DetConf,
@@ -26,6 +41,7 @@ function sipm_rate(file_path::String, outfile::String, dconf::NReco.DetConf,
     simd_events = 0
     evt_sipm    = SiPMEvt[]
     time_bins   = NReco.calculate_timebins(source_rate, evt_window)
+    kvals = Float32[0.0, 0.0, 0.0]
     for fn in glob("*.h5", file_path)
         pdf = read_abc(fn)
 
@@ -40,7 +56,19 @@ function sipm_rate(file_path::String, outfile::String, dconf::NReco.DetConf,
                 min_maxt = combine(reco_hits, :mtime => (x -> [extrema(x)]) => [:minv, :maxv])
                 tmin     = minimum(min_maxt.minv) 
                 tmax     = maximum(min_maxt.maxv)
-                push!(evt_sipm, SiPMEvt(nevt = nevt, nsipm = nsens, tmin = tmin, tmax = tmax))
+                xyzqt = NReco.sensor_positions(reco_hits, pdf.sensor_xyz)
+                if nrow(xyzqt) > 4
+                    #_, _, dotdf1, dotdf2 = NReco.lor_maxq(xyzqt)
+                    #println("nevent $nevt, dot product split df1 sensors = $(nrow(dotdf1)), df2 sensors = $(nrow(dotdf2))")
+                    for k in 2:4
+                        kvals[k-1] = lor_kmeansTest(xyzqt, k)
+                        #println("Test k = $k, mean silhouette = ", lor_kmeansTest(xyzqt, k))
+                    end
+                end
+                push!(evt_sipm, SiPMEvt(nevt  = nevt    , nsipm = nsens   ,
+                                        tmin  = tmin    , tmax  = tmax    ,
+                                        k2sil = kvals[1], k3sil = kvals[2],
+                                        k4sil = kvals[3]))
             end
         end
     end
