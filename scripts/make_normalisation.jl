@@ -49,7 +49,8 @@ function normalisation_histos(args::Dict{String, Any})
 		h5grp["acc"] = acc_hist
 		println("Size check: ", size(acc_hist))
 		# Test write an image file too.
-		NReco.write_img(outfile[1:end-2] * "raw", nbins, fov, Float32.(gen_hist ./ acc_hist))
+		NReco.write_img(outfile[1:end-2] * "raw", nbins, fov,
+						replace(Float32.(acc_hist ./ gen_hist), NaN => 0.0f0))
 	end
 	
 end
