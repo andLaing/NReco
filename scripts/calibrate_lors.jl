@@ -50,7 +50,7 @@ function parse_commandline()
             arg_type = String
             default  = "default"
     end
-    confArgs     = parse_args(s)
+    parse_args(s)
 end
 
 

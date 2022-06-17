@@ -34,6 +34,25 @@ function read_img(img_file::String, bigendian=true)
 end
 
 
+"""
+    write_img(img_file::String,
+              npixel::Tuple{Int64, Int64, Int64},
+              img_size::Tuple{Float32, Float32, Float32},
+              img_data::Array{Float32, 3})
+Write array as a binary image file.
+"""
+function write_img(img_file::String                          ,
+                   npixel  ::Tuple{UInt16 , UInt16 , UInt16 },
+                   img_size::Tuple{Float32, Float32, Float32},
+                   img_data::Array{Float32, 3}               )
+    open(img_file, "w") do img_out
+        write.(Ref(img_out), hton.(npixel))
+        write.(Ref(img_out), hton.(img_size))
+        write.(Ref(img_out), hton.(img_data))
+    end;
+end
+
+
 function split_parse(row::String)::Vector{Float32}
     parse.(Float32, split(row))
 end
