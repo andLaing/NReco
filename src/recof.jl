@@ -260,3 +260,77 @@ function calculate_interaction_radius!(df       ::DataFrame,
     transform!(df, sym1 => predictor => :r1x, sym2 => predictor => :r2x)
     nothing
 end
+
+## Functions for lor space transformation
+
+"""
+	lor_from_interaction(p1::Vector{<:Real}, p2::Vector{<:Real})
+
+Calculate the 4 dimensional lor space (r, phi, z, theta) components
+from the two xyz interaction points.
+where:
+	r   : Distance of closest approach to z axis.
+	phi : Angle between x axis and r.
+	z   : (z1 + z2) / 2
+	pi  : Angle between transverse plane and LOR.
+"""
+function lor_from_interaction(p1::Vector{<:Real}, p2::Vector{<:Real})
+	z_lor  = (p1[3] + p2[3]) / 2
+    dx     =  p2[1] - p1[1]
+    dy     =  p2[2] - p1[2]
+	r_num  = dx * p1[2] - dy * p1[1]
+    r_lor  = abs(r_num) / sqrt(dx * dx + dy * dy)
+    phi    = atan(dx, -dy)
+	# Correct in case quadrant incorrect.
+	phi    = r_num < 0 ? pi + phi : phi
+    trans1 = transverse_position(p1[1], p1[2], phi)
+    trans2 = transverse_position(p2[1], p2[2], phi)
+    theta  = atan(p2[3] - p1[3], trans2 - trans1)
+	# No need for 2pi as back-to-back gammas, -angle equivalent to pi-angle.
+	theta  = theta < 0 ? theta + pi : theta
+    return r_lor, phi, z_lor, theta
+end
+
+
+"""
+	transverse_position(x::Real, y::Real, phi::Real)
+
+Calculate the transverse position of a point given
+rotation into lor space by phi.
+"""
+function transverse_position(x::Real, y::Real, phi::Real)
+	y * cos(phi) - x * sin(phi)
+end
+
+"""
+	rlor_from_angle(x::Real, y::Real, phi::Real)
+
+Calculate the r of closest approach from a point
+on the line and the rotation angle.
+"""
+function rlor_from_angle(x::Real, y::Real, phi::Real)
+	x * cos(phi) + y * sin(phi)
+end
+
+
+"""
+	lor_from_primary(point::Vector{<:Real}, dir::Vector{<:Real})
+
+Calculate the 4 dimensional lor space (r, phi, z, theta) components
+from the true emission point and unit vector.
+z here is the z of emission since (z1 + z2) / 2 is not defined.
+Assumes back-to-back gammas generated in MC!
+"""
+function lor_from_primary(point::Vector{<:Real}, dir::Vector{<:Real})
+	phi   = atan(dir[1], -dir[2])
+	r_lor = rlor_from_angle(point[1], point[2], phi)
+	# Check quadrant
+	phi = r_lor < 0 ? phi + pi : phi
+	trans1 = transverse_position(point[1] - dir[1], point[2] - dir[2], phi)
+	trans2 = transverse_position(point[1] + dir[1], point[2] + dir[2], phi)
+	theta  = atan(2 * dir[3], trans2 - trans1)
+	# Not strictly correct:
+	z_lor = point[3]
+	theta = theta < 0 ? theta + pi : theta
+	return abs(r_lor), phi, z_lor, theta
+end

@@ -92,6 +92,45 @@ end
     @test all(isapprox.(2 * df[!, :zstd1], df[!, :r1x]))
 end
 
+@testset "lor_space" begin
+    ## First a simple one.
+    p1 = [ 10.0f0, 325.0f0, 0.0f0]
+    p2 = [-10.0f0, 325.0f0, 0.0f0]
+    r, phi, z, theta = NReco.lor_from_interaction(p1, p2)
+    @test r     == 325.0
+    @test isapprox(phi, pi / 2)
+    @test z     == 0.0f0
+    @test isapprox(theta, 0.0f0)
+    ## More complicated
+    p1 = [  0.0f0,  350.0f0,  10.0f0]
+    p2 = [-10.0f0, -325.0f0, -20.0f0]
+    r, phi, z, theta = NReco.lor_from_interaction(p1, p2)
+    @test r > 0
+    @test 0.0 <= phi < pi
+    @test z == (p1[3] + p2[3]) / 2
+
+    ## Now with a selected value. !Functions should be in a file somewhere from here
+    function first_vertex(vrts::SubDataFrame)::Bool
+        any(vrts.volume_id .== 0 .&& vrts.track_id .== 1) &&
+        any(vrts.volume_id .== 0 .&& vrts.track_id .== 2)
+    end
+    first_vrt  = first(filter(first_vertex, groupby(vdf, :event_id)))
+    first_vrt  = filter(row -> row.volume_id == 0 && (row.track_id == 1 || row.track_id == 2), first_vrt)
+    ## Up to here needs to be put somewhere central.
+    first_prim = pdf.primaries[pdf.primaries.event_id .== unique(first_vrt.event_id), :]
+    prim_point = Array(first_prim[1, [:x, :y, :z]])
+    prim_dir   = Array(first_prim[1, [:vx, :vy, :vz]])
+
+    ## From primaries: point + unit vector
+    track1 = Array(first_vrt[first_vrt.track_id .== 1, [:x, :y, :z]])
+    track2 = Array(first_vrt[first_vrt.track_id .== 2, [:x, :y, :z]])
+    lor_from_vrt  = NReco.lor_from_interaction(vec(track1), vec(track2))
+    lor_from_prim = NReco.lor_from_primary(prim_point, prim_dir)
+
+    # No check on the z since the definition is different.
+    @test all(isapprox.(lor_from_prim[1:end .!= 3], lor_from_vrt[1:end .!= 3]))
+end
+
 @testset "recohits" begin
     grp_wvf = groupby(wfm, :event_id)
     wvf1    = first(grp_wvf)
