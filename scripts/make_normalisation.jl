@@ -17,21 +17,38 @@ function normalisation_histos(args::Dict{String, Any})
 	nbins     = args["nbins"  ]
 	fov       = args["fov"    ]
 	outfile   = args["out"    ]
+	lor_out   = args["lor"    ]
 	# Always assume FOV centred.
 	bin_limits = [(-dim / 2, dim / 2) for dim in fov]
-	println("Nbins = ", Int16.(nbins))
 	h5open(outfile, "w") do h5out
 		h5grp    = create_group(h5out, "fov_acceptance")
 		gen_hist = zeros(Int, nbins)
 		acc_hist = zeros(Int, nbins)
 
+		(lor_cols, lor_bins, lor_lim, lor_gen, lor_acc) = if lor_out
+			lor_cols = [:r_lor, :phi_lor, :z_lor, :theta_lor]
+			lor_lim  = [(0.0f0, sqrt(bin_limits[1][2]^2 + bin_limits[1][2]^2)),
+						(-Float32(pi), Float32(pi)), bin_limits[3], (0.0f0, Float32(pi))]
+			lor_bins = (Int(ceil(lor_lim[1][2] / 2)), 20, Int(nbins[3]), 10)
+			lor_cols, lor_bins, lor_lim, zeros(Int, lor_bins), zeros(Int, lor_bins)
+		else
+			nothing, nothing, nothing, nothing, nothing
+		end
+
 		for fn in glob(f_pattern, indir)
 			primaries = readh5_todf(fn, "MC", "primaries")
 			vertices  = readh5_todf(fn, "MC", "vertices" )
 
-			origin_hist = ATools.hist3d(Matrix(primaries[!, [:x, :y, :z]]),
+			origin_hist = ATools.histNd(Matrix(primaries[!, [:x, :y, :z]]),
 		 								nbins, bin_limits)
 			gen_hist += origin_hist.weights
+			if !isnothing(lor_cols)
+				lor_space(x, y, z, vx, vy, vz) = NReco.lor_from_primary(vcat(x, y, z), vcat(vx, vy, vz))
+				transform!(primaries, Not(:event_id) => ByRow(lor_space) => lor_cols)
+				hist = ATools.histNd(Matrix(primaries[!, lor_cols]), lor_bins, lor_lim)
+				lor_gen += hist.weights
+			end
+
 
 			# First version only rustpetalo 'first-vertex' equivalent.
 			# Filter vertices for those with a track 1 and track 2 vertex in in LXe.
@@ -41,13 +58,22 @@ function normalisation_histos(args::Dict{String, Any})
 			end
 			vrt_evts  = getproperty.(keys(filter(first_vertex, groupby(vertices, :event_id))), :event_id)
 			prim_filt = filter(row -> in(vrt_evts)(row.event_id), primaries)
-			lxe_hist  = ATools.hist3d(Matrix(prim_filt[!, [:x, :y, :z]]),
+			lxe_hist  = ATools.histNd(Matrix(prim_filt[!, [:x, :y, :z]]),
 									  nbins, bin_limits)
 			acc_hist += lxe_hist.weights
+			if !isnothing(lor_cols)
+				hist = ATools.histNd(Matrix(prim_filt[!, lor_cols]), lor_bins, lor_lim)
+				lor_acc += hist.weights
+			end
 		end
 		h5grp["gen"] = gen_hist
 		h5grp["acc"] = acc_hist
-		println("Size check: ", size(acc_hist))
+		if !isnothing(lor_cols)
+			lorgrp        = create_group(h5out, "lor_acceptance")
+			lorgrp["gen"] = lor_gen
+			lorgrp["acc"] = lor_acc
+		end
+
 		# Test write an image file too.
 		NReco.write_img(outfile[1:end-2] * "raw", nbins, fov,
 						replace(Float32.(acc_hist ./ gen_hist), NaN => 0.0f0))
@@ -85,6 +111,9 @@ function parse_commandline()
 			help     = "comma separated list of FOV edge size."
 			arg_type = Tuple{Float32, Float32, Float32}
 			default  = (300.0f0, 300.0f0, 300.0f0)
+		"--lor", "-l"
+			help     = "Option to save LOR space binning too."
+			action   = :store_true
 	end
 	parse_args(s)
 end
@@ -92,7 +121,5 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
 	parsed_args = parse_commandline()
-	println("Check1: ", parsed_args["nbins"], typeof(parsed_args["nbins"]))
-	println("Check2: ", parsed_args["fov"], typeof(parsed_args["fov"]))
 	normalisation_histos(parsed_args)
 end
