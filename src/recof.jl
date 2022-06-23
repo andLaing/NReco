@@ -318,7 +318,8 @@ end
 
 Calculate the 4 dimensional lor space (r, phi, z, theta) components
 from the true emission point and unit vector.
-z here is the z of emission since (z1 + z2) / 2 is not defined.
+z here is the z of the midpoint of intersection with the xenon
+inner radius as not so well defined (0 in case of no intersection).
 Assumes back-to-back gammas generated in MC!
 """
 function lor_from_primary(point::Vector{<:Real}, dir::Vector{<:Real})
@@ -330,7 +331,30 @@ function lor_from_primary(point::Vector{<:Real}, dir::Vector{<:Real})
 	trans2 = transverse_position(point[1] + dir[1], point[2] + dir[2], phi)
 	theta  = atan(2 * dir[3], trans2 - trans1)
 	# Not strictly correct:
-	z_lor = point[3]
+	z_lor = lor_midpoint_z(point, dir)
 	theta = theta < 0 ? theta + pi : theta
 	return abs(r_lor), phi, z_lor, theta
+end
+
+
+"""
+	lor_midpoint_z(point::Vector{<:Real}, dir::Vector{<:Real})
+
+Find the midpoint z of the intersection of the ray with the
+inner surface of the detector barrel.
+TODO This repeats a lot of stuff that was in an ATools PR
+that needed review.
+"""
+function lor_midpoint_z(point::Vector{<:Real}, dir::Vector{<:Real})
+	r_cyl = 353.0f0 #Hardwired!! Should be improved
+	a     = dir[1]^2 + dir[2]^2
+	b     = 2 * (dir[1] * point[1] + dir[2] * point[2])
+	c     = point[1]^2 + point[2]^2 - r_cyl^2
+	if b^2 - 4 * a * c < 0
+		# Must be a primary that can't be detected, assume centred.
+		return 0.0
+	end
+	# Since we're considering an infinitely long barrel here
+	# either there's no intersection (along axis) or 2.
+	return (2 * point[3] - b * dir[3] / a) / 2
 end

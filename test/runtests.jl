@@ -127,8 +127,12 @@ end
     lor_from_vrt  = NReco.lor_from_interaction(vec(track1), vec(track2))
     lor_from_prim = NReco.lor_from_primary(prim_point, prim_dir)
 
-    # No check on the z since the definition is different.
+    # Check on z much less strict as definitions not the same.
     @test all(isapprox.(lor_from_prim[1:end .!= 3], lor_from_vrt[1:end .!= 3]))
+    # atol of 3 mm is sufficient here but difference could be more
+    # since true interaction points inside the xenon at arbitrary
+    # depth up to the outer edge.
+    @test isapprox(lor_from_prim[3], lor_from_vrt[3], atol=3)
 end
 
 @testset "recohits" begin
