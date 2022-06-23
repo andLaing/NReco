@@ -11,6 +11,48 @@ using DataFrames
 using Glob
 using HDF5
 
+
+# Not sure how to write an N dimensional vector to file
+# Brute force for now.
+struct fov_hist_meta <: ATools.OutputDataset
+	nbinx::Int16
+	nbiny::Int16
+	nbinz::Int16
+	minx ::Float32
+	maxx ::Float32
+	miny ::Float32
+	maxy ::Float32
+	minz ::Float32
+	maxz ::Float32
+end
+
+
+struct lor_hist_meta <: ATools.OutputDataset
+	nbinr  ::Int16
+	nbinphi::Int16
+	nbinz  ::Int16
+	nbinth ::Int16
+	minr   ::Float32
+	maxr   ::Float32
+	minphi ::Float32
+	maxphi ::Float32
+	minz   ::Float32
+	maxz   ::Float32
+	minth  ::Float32
+	maxth  ::Float32
+end
+
+function output_meta(data_type::Type{<: ATools.OutputDataset},
+					 group    ::HDF5.Group                   ,
+					 dset_name::String                       ,
+					 values   ::ATools.OutputDataset         )
+	out_dtype   = ATools.generate_hdf5_datatype(data_type)
+	meta_dspace = dataspace([values])
+	meta_dset   = create_dataset(group, dset_name, out_dtype, meta_dspace)
+	write_dataset(meta_dset, out_dtype, [values]);
+end
+
+
 function normalisation_histos(args::Dict{String, Any})
 	indir     = args["dir"    ]
 	f_pattern = args["pattern"]
@@ -24,6 +66,8 @@ function normalisation_histos(args::Dict{String, Any})
 		h5grp    = create_group(h5out, "fov_acceptance")
 		gen_hist = zeros(Int, nbins)
 		acc_hist = zeros(Int, nbins)
+		output_meta(fov_hist_meta, h5grp, "metadata",
+					fov_hist_meta(nbins..., (bin_limits...)...))
 
 		(lor_cols, lor_bins, lor_lim, lor_gen, lor_acc) = if lor_out
 			lor_cols = [:r_lor, :phi_lor, :z_lor, :theta_lor]
@@ -70,6 +114,8 @@ function normalisation_histos(args::Dict{String, Any})
 		h5grp["acc"] = acc_hist
 		if !isnothing(lor_cols)
 			lorgrp        = create_group(h5out, "lor_acceptance")
+			output_meta(lor_hist_meta, lorgrp, "metadata",
+						lor_hist_meta(lor_bins..., (lor_lim...)...))
 			lorgrp["gen"] = lor_gen
 			lorgrp["acc"] = lor_acc
 		end
