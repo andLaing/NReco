@@ -53,6 +53,18 @@ function output_meta(data_type::Type{<: ATools.OutputDataset},
 end
 
 
+function first_vertex(vrts::SubDataFrame)::Bool
+	any(vrts.volume_id .== 0 .&& vrts.track_id .== 1) &&
+	any(vrts.volume_id .== 0 .&& vrts.track_id .== 2)
+end
+
+
+function filter_energy(gdf::SubDataFrame, minE::Float32)
+	any(gdf.volume_id .== 0 .&& gdf.track_id .== 1 .&& gdf.pre_KE .> minE) &
+	any(gdf.volume_id .== 0 .&& gdf.track_id .== 2 .&& gdf.pre_KE .> minE)
+end
+
+
 function normalisation_histos(args::Dict{String, Any})
 	indir     = args["dir"    ]
 	f_pattern = args["pattern"]
@@ -96,11 +108,9 @@ function normalisation_histos(args::Dict{String, Any})
 
 			# First version only rustpetalo 'first-vertex' equivalent.
 			# Filter vertices for those with a track 1 and track 2 vertex in in LXe.
-			function first_vertex(vrts::SubDataFrame)::Bool
-				any(vrts.volume_id .== 0 .&& vrts.track_id .== 1) &&
-				any(vrts.volume_id .== 0 .&& vrts.track_id .== 2)
-			end
-			vrt_evts  = getproperty.(keys(filter(first_vertex, groupby(vertices, :event_id))), :event_id)
+			filt_vrt  = filter(first_vertex, groupby(vertices, :event_id))
+			filt_vrt  = filter(grp -> filter_energy(grp, args["eng"]), filt_vrt)
+			vrt_evts  = getproperty.(keys(filt_vrt), :event_id)
 			prim_filt = filter(row -> in(vrt_evts)(row.event_id), primaries)
 			lxe_hist  = ATools.histNd(Matrix(prim_filt[!, [:x, :y, :z]]),
 									  nbins, bin_limits)
@@ -157,6 +167,10 @@ function parse_commandline()
 			help     = "comma separated list of FOV edge size."
 			arg_type = Tuple{Float32, Float32, Float32}
 			default  = (300.0f0, 300.0f0, 300.0f0)
+		"--eng", "-e"
+			help     = "minimum true energy to consider."
+			arg_type = Float32
+			default  = 0.0f0
 		"--lor", "-l"
 			help     = "Option to save LOR space binning too."
 			action   = :store_true
