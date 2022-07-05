@@ -106,7 +106,7 @@ end
     p2 = [-10.0f0, -325.0f0, -20.0f0]
     r, phi, z, theta = NReco.lor_from_interaction(p1, p2)
     @test r > 0
-    @test 0.0 <= phi < pi
+    @test -pi <= phi < pi
     @test z == (p1[3] + p2[3]) / 2
 
     ## Now with a selected value. !Functions should be in a file somewhere from here

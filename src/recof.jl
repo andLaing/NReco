@@ -282,7 +282,7 @@ function lor_from_interaction(p1::Vector{<:Real}, p2::Vector{<:Real})
     r_lor  = abs(r_num) / sqrt(dx * dx + dy * dy)
     phi    = atan(dx, -dy)
 	# Correct in case quadrant incorrect.
-	phi    = r_num < 0 ? pi + phi : phi
+	phi    = dx < 0 ? pi + phi : phi
     trans1 = transverse_position(p1[1], p1[2], phi)
     trans2 = transverse_position(p2[1], p2[2], phi)
     theta  = atan(p2[3] - p1[3], trans2 - trans1)
@@ -325,8 +325,7 @@ Assumes back-to-back gammas generated in MC!
 function lor_from_primary(point::Vector{<:Real}, dir::Vector{<:Real})
 	phi   = atan(dir[1], -dir[2])
 	r_lor = rlor_from_angle(point[1], point[2], phi)
-	# Check quadrant
-	phi = r_lor < 0 ? phi + pi : phi
+	phi = dir[1] < 0 ? phi + pi : phi
 	trans1 = transverse_position(point[1] - dir[1], point[2] - dir[2], phi)
 	trans2 = transverse_position(point[1] + dir[1], point[2] + dir[2], phi)
 	theta  = atan(2 * dir[3], trans2 - trans1)
