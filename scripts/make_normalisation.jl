@@ -64,6 +64,15 @@ function filter_energy(gdf::SubDataFrame, minE::Float32)
 	any(gdf.volume_id .== 0 .&& gdf.track_id .== 2 .&& gdf.pre_KE .> minE)
 end
 
+function lor_space(x ::Float32,
+				   y ::Float32,
+				   z ::Float32,
+				   vx::Float32,
+				   vy::Float32,
+				   vz::Float32)
+	NReco.lor_from_primary(vcat(x, y, z), vcat(vx, vy, vz))
+end
+
 
 function normalisation_histos(args::Dict{String, Any})
 	indir     = args["dir"    ]
@@ -99,7 +108,7 @@ function normalisation_histos(args::Dict{String, Any})
 		 								nbins, bin_limits)
 			gen_hist += origin_hist.weights
 			if !isnothing(lor_cols)
-				lor_space(x, y, z, vx, vy, vz) = NReco.lor_from_primary(vcat(x, y, z), vcat(vx, vy, vz))
+				# lor_space(x, y, z, vx, vy, vz) = NReco.lor_from_primary(vcat(x, y, z), vcat(vx, vy, vz))
 				transform!(primaries, Not(:event_id) => ByRow(lor_space) => lor_cols)
 				hist = ATools.histNd(Matrix(primaries[!, lor_cols]), lor_bins, lor_lim)
 				lor_gen += hist.weights
