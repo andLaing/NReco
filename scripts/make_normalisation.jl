@@ -85,7 +85,7 @@ function normalisation_histos(args::Dict{String, Any})
 			lor_cols = [:r_lor, :phi_lor, :z_lor, :theta_lor]
 			lor_lim  = [(0.0f0, sqrt(bin_limits[1][2]^2 + bin_limits[1][2]^2)),
 						(-Float32(pi), Float32(pi)), bin_limits[3], (0.0f0, Float32(pi))]
-			lor_bins = (Int(ceil(lor_lim[1][2] / 2)), 20, Int(nbins[3]), 10)
+			lor_bins = (Int(ceil(lor_lim[1][2] / 5)), 20, Int(nbins[3]), 10)
 			lor_cols, lor_bins, lor_lim, zeros(Int, lor_bins), zeros(Int, lor_bins)
 		else
 			nothing, nothing, nothing, nothing, nothing
