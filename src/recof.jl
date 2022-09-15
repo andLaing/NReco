@@ -3,10 +3,30 @@ using ATools
 using Clustering
 using DataFrames
 using Distances
+using Distributions
 using HDF5
 using LinearAlgebra
 using Statistics
 using StatsModels
+using Unitful
+
+
+# Time bins for event mixing.
+function calculate_timebins(evts::DataFrame, waveforms  ::DataFrame,
+	                        rate::Float32  , time_window::Float32  )
+	# Assume rate in Bq and convert to a period in ns
+	period = uconvert(Unitful.ns, 1.0 / (rate * Unitful.Bq))
+	# Assumes constant rate for now, will be improved
+	time_dist = Exponential(period / Unitful.ns)
+	evts[!, :evt_time] = cumsum([0.0, rand(time_dist, nrow(evts) -1)...])
+	function bin_events(x::Vector{Float64})
+		bin_edges = collect(0:time_window:x[end]+nextfloat(x[end]))
+		ATools.digitize(x, bin_edges)
+	end
+	wvfs = innerjoin(waveforms, evts, on=:event_id)
+	transform!(wvfs, [:time, :evt_time] => (+) => :time)
+	transform!(wvfs, :time => bin_events => :time_bin)
+end
 
 # Selection
 

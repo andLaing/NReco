@@ -14,12 +14,14 @@ using HDF5
 
 import Base.@kwdef
 @kwdef struct SiPMEvt <: ATools.OutputDataset
-    nsipm::Int64 = zero(Int64)
+    nevt ::Int64   = one(Int64)
+    nsipm::Int64   = zero(Int64)
     tmin ::Float32 = zero(Float32)
     tmax ::Float32 = zero(Float32)
 end
 
-function sipm_rate(file_path::String, outfile::String, dconf::NReco.DetConf)
+function sipm_rate(file_path::String, outfile::String, dconf::NReco.DetConf,
+                   source_rate::Float32, evt_window::Float32)
 
     simd_events = 0
     evt_sipm    = SiPMEvt[]
@@ -27,14 +29,19 @@ function sipm_rate(file_path::String, outfile::String, dconf::NReco.DetConf)
         pdf = read_abc(fn)
 
         simd_events += nrow(pdf.primaries)
-        for wvf in groupby(pdf.waveform, :event_id)
+        mixed_waveforms = NReco.calculate_timebins(pdf.primaries[:, [:event_id]],
+                                                   pdf.waveform,
+                                                   source_rate, evt_window)
+        # for wvf in groupby(pdf.waveform, :event_id)
+        for wvf in groupby(mixed_waveforms, :time_bin)
             reco_hits  = NReco.select_sensors(wvf, dconf.ecut, dconf.pde, dconf.sigma_tof)
             if !isnothing(reco_hits) && !isempty(reco_hits)
+                nevt     = length(unique(wvf.event_id))
                 nsens    = length(keys(reco_hits))
                 min_maxt = combine(reco_hits, :mtime => minimum => :minv, :mtime => maximum => :maxv)
                 tmin     = minimum(min_maxt.minv) 
                 tmax     = maximum(min_maxt.maxv)
-                push!(evt_sipm, SiPMEvt(nsipm = nsens, tmin = tmin, tmax = tmax))
+                push!(evt_sipm, SiPMEvt(nevt = nevt, nsipm = nsens, tmin = tmin, tmax = tmax))
             end
         end
     end
@@ -64,6 +71,14 @@ if abspath(PROGRAM_FILE) == @__FILE__
 			help     = "detector configuration"
 			default  = "default"
 			arg_type = String
+        "--rate", "-r"
+            help     = "Source rate in Bq"
+            default  = 2000.0f0
+            arg_type = Float32
+        "--window", "-w"
+            help     = "Event coincidence window in ns"
+            default  = 1000.0f0
+            arg_type = Float32
     end
     parsed_args = parse_args(s)
 
@@ -73,5 +88,6 @@ if abspath(PROGRAM_FILE) == @__FILE__
     else
         dconf = NReco.DetConf()
     end
-    sipm_rate(parsed_args["dir"], parsed_args["ofile"], dconf)
+    sipm_rate(parsed_args["dir"], parsed_args["ofile"], dconf,
+              parsed_args["rate"], parsed_args["window"])
 end
